@@ -22,6 +22,7 @@ from lib.clickup import (
 )
 from lib.field_mapping import (
     FIELD_MAP,
+    PROPAGATE_FIELD_IDS,
     extract_field_values,
     format_value_for_update,
 )
@@ -210,6 +211,40 @@ def webhook():
     message = f"Updated {len(fields_updated)} of {total} fields on Client Snapshot"
     logger.info(f"Result: {message}")
 
+    # Step 6: Propagate contact fields to all other tasks in Discovery + Intake
+    propagate_values = {
+        fid: field_values[fid]
+        for fid in PROPAGATE_FIELD_IDS
+        if fid in field_values
+    }
+
+    tasks_propagated = []
+    tasks_prop_failed = []
+
+    if propagate_values:
+        other_tasks = [t for t in tasks if t["id"] != snapshot_task_id]
+        logger.info(
+            f"Propagating {len(propagate_values)} contact fields to "
+            f"{len(other_tasks)} other tasks"
+        )
+
+        for task in other_tasks:
+            task_name = task.get("name", "Unknown")
+            task_ok = True
+            for fid, raw_val in propagate_values.items():
+                formatted = format_value_for_update(fid, raw_val)
+                if not update_task_field(token, task["id"], fid, formatted):
+                    task_ok = False
+            if task_ok:
+                tasks_propagated.append(task_name)
+            else:
+                tasks_prop_failed.append(task_name)
+
+        logger.info(
+            f"Propagation: {len(tasks_propagated)} tasks updated, "
+            f"{len(tasks_prop_failed)} failed"
+        )
+
     return jsonify({
         "status": status,
         "message": message,
@@ -218,6 +253,8 @@ def webhook():
         "fields_updated": fields_updated,
         "fields_skipped": fields_skipped,
         "fields_failed": fields_failed,
+        "tasks_propagated": tasks_propagated,
+        "tasks_propagation_failed": tasks_prop_failed,
     }), 200
 
 

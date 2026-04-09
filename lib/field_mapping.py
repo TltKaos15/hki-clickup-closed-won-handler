@@ -3,6 +3,14 @@ Field mapping and value formatting for HKI ClickUp custom fields.
 Maps the 7 shared custom fields between Sales CRM and Client Snapshot tasks.
 """
 
+# Fields to propagate to ALL tasks in the Discovery + Intake list (not just Client Snapshot)
+PROPAGATE_FIELD_IDS = {
+    "7c409897-f0c8-451f-bd6c-79fa0dbf2cd6",  # Company
+    "3f019ca2-cde2-4de8-9830-08ceea00234b",  # Primary Contact
+    "b27b1a2f-e31c-4266-9339-42692223b899",  # Contact Email
+    "1787374a-cf49-4b29-a218-37a7e4f9a441",  # Contact Phone
+}
+
 FIELD_MAP = {
     "7c409897-f0c8-451f-bd6c-79fa0dbf2cd6": {"name": "Company", "type": "short_text"},
     "3f019ca2-cde2-4de8-9830-08ceea00234b": {"name": "Primary Contact", "type": "short_text"},
