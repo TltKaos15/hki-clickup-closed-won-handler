@@ -7,6 +7,7 @@ Client Snapshot task in the new client folder.
 """
 
 import os
+import time
 import logging
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
@@ -37,6 +38,8 @@ app = Flask(__name__)
 
 DISCOVERY_INTAKE_LIST_NAME = "Discovery + Intake"
 CLIENT_SNAPSHOT_TASK_NAME = "Client Snapshot"
+MAX_RETRIES = 4
+RETRY_DELAY_SECONDS = 10
 
 
 @app.route("/webhook", methods=["POST"])
@@ -94,64 +97,84 @@ def webhook():
             "fields_failed": [],
         }), 200
 
-    # Step 3: Find Discovery + Intake list in new folder
-    try:
-        lists = get_folder_lists(token, new_folder_id)
-    except FolderNotFoundError:
-        return jsonify({
-            "status": "error",
-            "message": f"Folder {new_folder_id} not found",
-        }), 404
-    except Exception as e:
-        logger.error(f"Error fetching folder lists: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error fetching folder lists: {e}",
-        }), 500
-
-    discovery_list = None
-    for lst in lists:
-        if lst.get("name") == DISCOVERY_INTAKE_LIST_NAME:
-            discovery_list = lst
-            break
-
-    if not discovery_list:
-        list_names = [lst.get("name") for lst in lists]
-        return jsonify({
-            "status": "error",
-            "message": (
-                f"'{DISCOVERY_INTAKE_LIST_NAME}' list not found in folder. "
-                f"Available lists: {list_names}"
-            ),
-        }), 404
-
-    discovery_list_id = discovery_list["id"]
-    logger.info(f"Found Discovery + Intake list: {discovery_list_id}")
-
-    # Step 4: Find Client Snapshot task
-    try:
-        tasks = get_list_tasks(token, discovery_list_id)
-    except Exception as e:
-        logger.error(f"Error fetching list tasks: {e}")
-        return jsonify({
-            "status": "error",
-            "message": f"Error fetching tasks in Discovery + Intake: {e}",
-        }), 500
-
+    # Step 3 & 4: Find Discovery + Intake list and Client Snapshot task
+    # Retry logic handles ClickUp's async template cloning — tasks may not
+    # be available immediately after folder creation
     snapshot_task = None
-    for task in tasks:
-        if task.get("name") == CLIENT_SNAPSHOT_TASK_NAME:
-            snapshot_task = task
+    last_error = None
+
+    for attempt in range(1, MAX_RETRIES + 1):
+        logger.info(f"Attempt {attempt}/{MAX_RETRIES}: looking for Client Snapshot")
+
+        # Find folder lists
+        try:
+            lists = get_folder_lists(token, new_folder_id)
+        except FolderNotFoundError:
+            return jsonify({
+                "status": "error",
+                "message": f"Folder {new_folder_id} not found",
+            }), 404
+        except Exception as e:
+            last_error = f"Error fetching folder lists: {e}"
+            logger.warning(last_error)
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY_SECONDS)
+                continue
             break
+
+        # Find Discovery + Intake list
+        discovery_list = None
+        for lst in lists:
+            if lst.get("name") == DISCOVERY_INTAKE_LIST_NAME:
+                discovery_list = lst
+                break
+
+        if not discovery_list:
+            last_error = (
+                f"'{DISCOVERY_INTAKE_LIST_NAME}' list not found in folder. "
+                f"Available lists: {[lst.get('name') for lst in lists]}"
+            )
+            logger.warning(last_error)
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY_SECONDS)
+                continue
+            break
+
+        discovery_list_id = discovery_list["id"]
+        logger.info(f"Found Discovery + Intake list: {discovery_list_id}")
+
+        # Find Client Snapshot task
+        try:
+            tasks = get_list_tasks(token, discovery_list_id)
+        except Exception as e:
+            last_error = f"Error fetching tasks in Discovery + Intake: {e}"
+            logger.warning(last_error)
+            if attempt < MAX_RETRIES:
+                time.sleep(RETRY_DELAY_SECONDS)
+                continue
+            break
+
+        for task in tasks:
+            if task.get("name") == CLIENT_SNAPSHOT_TASK_NAME:
+                snapshot_task = task
+                break
+
+        if snapshot_task:
+            break
+
+        last_error = (
+            f"'{CLIENT_SNAPSHOT_TASK_NAME}' task not found in Discovery + Intake. "
+            f"Available tasks: {[t.get('name') for t in tasks]}"
+        )
+        logger.warning(last_error)
+        if attempt < MAX_RETRIES:
+            logger.info(f"Waiting {RETRY_DELAY_SECONDS}s before retry...")
+            time.sleep(RETRY_DELAY_SECONDS)
 
     if not snapshot_task:
-        task_names = [t.get("name") for t in tasks]
         return jsonify({
             "status": "error",
-            "message": (
-                f"'{CLIENT_SNAPSHOT_TASK_NAME}' task not found in Discovery + Intake. "
-                f"Available tasks: {task_names}"
-            ),
+            "message": f"After {MAX_RETRIES} attempts: {last_error}",
         }), 404
 
     snapshot_task_id = snapshot_task["id"]
