@@ -12,6 +12,7 @@ PROPAGATE_FIELD_IDS = {
 }
 
 FIELD_MAP = {
+    "0432418c-591c-4202-a07a-9a53a2d414f9": {"name": "Comments", "type": "text"},
     "7c409897-f0c8-451f-bd6c-79fa0dbf2cd6": {"name": "Company", "type": "short_text"},
     "3f019ca2-cde2-4de8-9830-08ceea00234b": {"name": "Primary Contact", "type": "short_text"},
     "b27b1a2f-e31c-4266-9339-42692223b899": {"name": "Contact Email", "type": "email"},
@@ -84,7 +85,7 @@ def format_value_for_update(field_id, raw_value):
     """
     field_type = FIELD_MAP[field_id]["type"]
 
-    if field_type in ("short_text", "email", "phone"):
+    if field_type in ("text", "short_text", "email", "phone"):
         return str(raw_value)
 
     if field_type == "currency":
