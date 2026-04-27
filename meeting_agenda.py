@@ -31,7 +31,7 @@ MEETINGS = {
     "team": {
         "parent_page_id": "2kz9rknq-517",  # "Weekly Team Meetings"
         "target_weekday": 3,  # Thursday
-        "name_format": "Weekly Team Meeting — %a %b %-d %Y",
+        "name_format": "%-m/%-d - Weekly Team Meeting",
         "content": """\
 **Attendees**
 *   [@hki-all](#user_group_mention#caa8fb2c-651c-48b0-8f04-1369376f2703)
@@ -54,7 +54,7 @@ MEETINGS = {
     "jm": {
         "parent_page_id": "2kz9rknq-617",  # "Weekly J&M Meetings"
         "target_weekday": 0,  # Monday
-        "name_format": "Weekly Jenni and Mickey Meeting — %a %b %-d %Y",
+        "name_format": "%-m/%-d - Weekly Jenni and Mickey Meeting",
         "content": """\
 **Attendees**
 *   [@Jenni Arnold](#user_mention#101113187) [@Mickey Clinard](#user_mention#198194918)
