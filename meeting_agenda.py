@@ -112,6 +112,7 @@ def create_meeting_page(token, meeting_key):
         "sub_title": meeting_date.strftime("%A, %B %-d, %Y"),
         "content": config["content"],
         "content_format": "text/md",
+        "avatar": {"value": "emoji::🗓️"},
     }
 
     resp = requests.post(url, headers=headers, json=payload)
